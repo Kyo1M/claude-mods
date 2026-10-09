@@ -1,0 +1,14 @@
+{
+  "name": "claude-mods",
+  "description": "Kyo1M の Claude Code mod 集",
+  "owner": {
+    "name": "Kyo1M"
+  },
+  "plugins": [
+    {
+      "name": "orca-split-editor",
+      "source": "./orca-split-editor",
+      "description": "Orca のペインを上下に分割してエディタでプロンプトを書く"
+    }
+  ]
+}

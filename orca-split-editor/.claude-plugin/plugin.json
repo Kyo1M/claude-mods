@@ -2,5 +2,8 @@
   "name": "orca-split-editor",
   "version": "0.1.0",
   "description": "Orca のペインを上下に分割してエディタでプロンプトを書く",
+  "author": {
+    "name": "Kyo1M"
+  },
   "types": "./types/index.d.ts"
 }
