@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Editing } from '../types'
-import { ORCA, readHostEnv, startEdit } from './editor'
+import { readHostEnv, startEdit } from './editor'
 import type { Deps } from './editor'
 
 const editing = atom({ plugin: 'orca-split-editor', key: 'editing' } as const, null as Editing | null)
@@ -16,15 +16,17 @@ const KEY_ACTION = 'app:toggleReplTab'
 function depsOf($: EngineInterface): Deps {
   return {
     run: argv => $.process.run(argv),
-    waitExit: async handle => {
-      const stream = $.process.spawn({
-        argv: [ORCA, 'terminal', 'wait', '--terminal', handle, '--for', 'exit', '--json'],
-      })
-      for await (const _ of stream) {
-        // 出力は使わない。終わるまで読み切る
+    runLong: async argv => {
+      // $.process.run は最長 10 分で切れるので spawn で読み切る
+      const stream = $.process.spawn({ argv })
+      let stdout = ''
+      let stderr = ''
+      for await (const chunk of stream) {
+        if (chunk.stream === 'stdout') stdout += chunk.text
+        else stderr += chunk.text
       }
       const { code } = await stream.result
-      if (code !== 0) throw new Error(`orca terminal wait exited ${code}`)
+      return { exitCode: code ?? 1, stdout, stderr }
     },
     readPrompt: async () => (await $.prompt.read()).text,
     fillPrompt: async text => (await $.prompt.fill({ text, mode: 'replace' })).isFilled,

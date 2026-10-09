@@ -8,8 +8,8 @@ export type RunResult = { exitCode: number; stdout: string; stderr: string }
 /** 外の世界との接点。register.tsx が $ でつなぎ、テストは差し替える */
 export type Deps = {
   run: (argv: readonly string[]) => Promise<RunResult>
-  /** 分割ペインのエディタが終わるまで待つ(時間制限なし) */
-  waitExit: (handle: string) => Promise<void>
+  /** run と同じだが時間制限なし(エディタの終了待ちに使う) */
+  runLong: (argv: readonly string[]) => Promise<RunResult>
   readPrompt: () => Promise<string>
   /** 入れられたら true */
   fillPrompt: (text: string) => Promise<boolean>
@@ -34,6 +34,30 @@ export async function readHostEnv(run: Deps['run']): Promise<HostEnv> {
   return {
     handle: vars.get('ORCA_TERMINAL_HANDLE') || null,
     editor: vars.get('VISUAL') || vars.get('EDITOR') || 'vi',
+  }
+}
+
+/** 1 回の待ちの上限。切れたら待ち直す */
+export const WAIT_SLICE_MS = 600_000
+
+/** エディタが終わるまで待つ。終了を確認できたら true、確認できない失敗なら false */
+export async function waitForEditor(deps: Deps, handle: string): Promise<boolean> {
+  for (;;) {
+    const r = await deps.runLong([
+      ORCA, 'terminal', 'wait', '--terminal', handle,
+      '--for', 'exit', '--timeout-ms', String(WAIT_SLICE_MS), '--json',
+    ])
+    let json: any
+    try {
+      json = JSON.parse(r.stdout)
+    } catch {
+      return false
+    }
+    if (json?.ok === true && json.result?.wait?.satisfied === true) return true
+    const isTimeout =
+      (json?.ok === false && json.error?.code === 'timeout') ||
+      (json?.ok === true && json.result?.wait?.satisfied === false)
+    if (!isTimeout) return false
   }
 }
 
@@ -83,12 +107,13 @@ export async function startEdit(deps: Deps): Promise<void> {
 
   await deps.setEditing({ handle, file })
   try {
-    try {
-      await deps.waitExit(handle)
-    } catch {
-      deps.toast('エディタの終了を確認できませんでした。書いた分を取り込みます')
+    if (!(await waitForEditor(deps, handle))) {
+      // 書きかけを失わないよう、ペインは閉じず取り込みもしない
+      deps.toast(`エディタの終了を確認できませんでした。下書き: ${file}`)
+      return
     }
     await deps.run([ORCA, 'terminal', 'close', '--terminal', handle, '--json']).catch(() => undefined)
+    await deps.run([ORCA, 'terminal', 'focus', '--terminal', env.handle, '--json']).catch(() => undefined)
 
     let text: string
     try {

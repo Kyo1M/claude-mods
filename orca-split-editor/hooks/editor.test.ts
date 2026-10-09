@@ -6,12 +6,22 @@ import type { Deps, RunResult } from './editor'
 
 const SPLIT_OK = JSON.stringify({ ok: true, result: { split: { handle: 'term_new' } } })
 
-function fakeDeps(opts: { env?: string; split?: RunResult; afterEdit?: string; editing?: Editing | null }) {
+const WAIT_DONE = JSON.stringify({ ok: true, result: { wait: { satisfied: true, status: 'exited' } } })
+const WAIT_TIMEOUT = JSON.stringify({ ok: false, error: { code: 'timeout', message: 'timeout' } })
+
+function fakeDeps(opts: {
+  env?: string
+  split?: RunResult
+  afterEdit?: string
+  editing?: Editing | null
+  waits?: string[]
+}) {
   const files = new Map<string, string>()
   const calls: string[][] = []
   const toasts: string[] = []
   let prompt = 'abc'
   let editing: Editing | null = opts.editing ?? null
+  const waits = [...(opts.waits ?? [WAIT_DONE])]
   const deps: Deps = {
     run: async argv => {
       calls.push([...argv])
@@ -19,9 +29,14 @@ function fakeDeps(opts: { env?: string; split?: RunResult; afterEdit?: string; e
       if (argv[2] === 'split') return opts.split ?? { exitCode: 0, stdout: SPLIT_OK, stderr: '' }
       return { exitCode: 0, stdout: '{"ok":true}', stderr: '' }
     },
-    waitExit: async () => {
-      // エディタで書き換えて閉じたことにする
-      for (const path of files.keys()) files.set(path, opts.afterEdit ?? files.get(path)!)
+    runLong: async argv => {
+      calls.push([...argv])
+      const stdout = waits.shift() ?? WAIT_DONE
+      // 終了を返すときは、エディタで書き換えて閉じたことにする
+      if (stdout === WAIT_DONE) {
+        for (const path of files.keys()) files.set(path, opts.afterEdit ?? files.get(path)!)
+      }
+      return { exitCode: stdout === WAIT_DONE ? 0 : 1, stdout, stderr: '' }
     },
     readPrompt: async () => prompt,
     fillPrompt: async text => {
@@ -83,4 +98,21 @@ test('編集中にもう一度呼ぶと分割ペインへ移るだけ', async ()
   expect(f.calls.some(c => c[2] === 'split')).toBe(false)
   expect(f.calls.some(c => c[2] === 'focus' && c[4] === 'term_old')).toBe(true)
   expect(f.editing()).toEqual({ handle: 'term_old', file: '/tmp/x.md' })
+})
+
+test('待ちの上限が切れたら待ち直し、閉じてから取り込む', async () => {
+  const f = fakeDeps({ env: ORCA_ENV, afterEdit: 'long\n', waits: [WAIT_TIMEOUT, WAIT_DONE] })
+  await startEdit(f.deps)
+  const kinds = f.calls.map(c => c[2]).filter(k => k === 'wait' || k === 'close')
+  expect(kinds).toEqual(['wait', 'wait', 'close'])
+  expect(f.prompt()).toBe('long')
+})
+
+test('終了を確認できなければペインを閉じず取り込まない', async () => {
+  const f = fakeDeps({ env: ORCA_ENV, afterEdit: 'xyz', waits: ['not json'] })
+  await startEdit(f.deps)
+  expect(f.calls.some(c => c[2] === 'close')).toBe(false)
+  expect(f.prompt()).toBe('abc')
+  expect(f.editing()).toBe(null)
+  expect(f.toasts).toHaveLength(1)
 })

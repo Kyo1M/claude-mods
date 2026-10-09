@@ -52,8 +52,8 @@ claude-mods/
 3. `$.prompt.read()` で下書きを取り、`/tmp/claude-orca-split-editor/draft-<時刻>.md` に書く(`$.fs.write`)。
 4. `orca terminal split --terminal <ハンドル> --direction <上下> --command "exec <エディタ> '<ファイル>'" --json` を実行し、JSON から新しいペインのハンドルを取る。失敗したらトーストで理由を出して終わる。
 5. 状態を「編集中」にする(帯が切り替わる)。
-6. `orca terminal wait --terminal <新ハンドル> --for exit` を `$.process.spawn` で待つ(`$.process.run` は最長 10 分で切れるため、長文の編集に備えて spawn を使う)。待つ処理はフックから切り離し、Claude Code の操作を止めない。
-7. 終了したら `orca terminal close --terminal <新ハンドル>` で分割ペインを閉じる(すでに閉じていても害はない)。
+6. `orca terminal wait --terminal <新ハンドル> --for exit --timeout-ms 600000` を `$.process.spawn` で待ち、上限が切れたら待ち直す(`$.process.run` は最長 10 分で切れるため、長文の編集に備えて spawn を使う)。待つ処理はフックから切り離し、Claude Code の操作を止めない。
+7. 終了を確認できたら `orca terminal close --terminal <新ハンドル>` で分割ペインを閉じ(すでに閉じていても害はない)、`orca terminal focus` で Claude Code のペインへ戻る。
 8. ファイルを読み、`$.prompt.fill({ text, mode: "replace" })` で入れる。状態を「待機中」に戻し、一時ファイルは残す(取り込みに失敗したときに手で拾えるように)。
 
 `orca` は `/Applications/Orca.app/Contents/Resources/bin/orca` を使う(`/usr/local/bin/orca` のリンクは権限の都合で動かないことを確認済み)。
@@ -81,7 +81,8 @@ Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 | Orca の外(ハンドルが無い) | 帯を出さない。`/edit` はトーストで案内して終わる |
 | `orca terminal split` が失敗 | トーストに orca の出力の 1 行目を出す。状態は待機中のまま |
 | 編集中にもう一度起動 | 分割ペインへ移るだけ |
-| 待機の `orca terminal wait` が異常終了 | ファイルはそのまま取り込みを試み、トーストで知らせる |
+| `orca terminal wait` の上限(1 回 10 分)が切れた | 待ち直す |
+| エディタの終了を確認できない(`wait` の失敗) | ペインは閉じず取り込みもしない。トーストに一時ファイルのパスを出し、待機中に戻す |
 | ファイルが読めない | トーストに一時ファイルのパスを出す |
 | プロンプト欄に入らない(`fill` が `isFilled: false`。ダイアログ表示中など) | トーストに一時ファイルのパスを出す |
 | mod の読み直し(保存時) | 待機中の処理は切れる。状態だけ「編集中」が残るので、`session.start` で待機中に戻す |
@@ -102,7 +103,7 @@ Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 - Orca 上の Claude Code で Ctrl+G を押すと、下側に hx が今の下書き入りで開き、上側の会話は見えたままである。
 - hx で保存して閉じると、書いた文がプロンプト欄に入る。`:q!` で閉じると下書きは変わらない。
 - `/edit` でも同じ動きをする。
-- テスト 4 件・validate・tsc が通る。
+- テスト 6 件・validate・tsc が通る。
 
 ## 実装時に確かめたこと
 
