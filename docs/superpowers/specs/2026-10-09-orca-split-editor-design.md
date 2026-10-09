@@ -104,10 +104,10 @@ Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 - `/edit` でも同じ動きをする。
 - テスト 4 件・validate・tsc が通る。
 
-## 実装時に確かめること
+## 実装時に確かめたこと
 
-- 最初に:Ctrl+G で起動できるか(「キー割り当て」の 2 つの試し)。これが決まるまで mod 本体には入らない。
-- 上下に分ける `--direction` の値(`horizontal` と `vertical` のどちらが上下か)。
-- `/edit` が他のコマンドと重ならないか(手元の commands・skills には無いことを確認済み)。
+- キー割り当て:使い捨ての mod で試し、方法 1(帯の Button の `action`)は 3 つの候補すべてで押された。方法 2 は、Chat の `ctrl+g` を外しても Ctrl+G が `prompt.edit` に届かなかった。そこで方法 1 を採り、`app:toggleReplTab` を使う。
+- 上下の分割は `--direction vertical`(Orca の手順書で `horizontal` は左右、`vertical` は上下)。
+- `/edit` は手元の commands・skills と重ならない。
 
 `--command` の文字列がシェルで解釈されること(`;` と `exit` が効く)は確認済み。一時ファイルのパスには空白を含めない。

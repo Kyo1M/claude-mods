@@ -1,0 +1,86 @@
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
+
+import type { Editing } from '../types'
+import { ORCA, readHostEnv, startEdit } from './editor'
+import type { Deps } from './editor'
+
+const editing = atom({ plugin: 'orca-split-editor', key: 'editing' } as const, null as Editing | null)
+const inOrca = atom({ plugin: 'orca-split-editor', key: 'inOrca' } as const, false)
+const editor = atom({ plugin: 'orca-split-editor', key: 'editor' } as const, 'vi')
+
+// keybindings.json で Global の ctrl+g をこの action に割り当てる。
+// 本体の処理が常駐しない action なので、帯の Button が Ctrl+G で押される。
+const KEY_ACTION = 'app:toggleReplTab'
+
+function depsOf($: EngineInterface): Deps {
+  return {
+    run: argv => $.process.run(argv),
+    waitExit: async handle => {
+      const stream = $.process.spawn({
+        argv: [ORCA, 'terminal', 'wait', '--terminal', handle, '--for', 'exit', '--json'],
+      })
+      for await (const _ of stream) {
+        // 出力は使わない。終わるまで読み切る
+      }
+      const { code } = await stream.result
+      if (code !== 0) throw new Error(`orca terminal wait exited ${code}`)
+    },
+    readPrompt: async () => (await $.prompt.read()).text,
+    fillPrompt: async text => (await $.prompt.fill({ text, mode: 'replace' })).isFilled,
+    readFile: async path => String(await $.fs.read(path)),
+    writeFile: (path, text) => $.fs.write(path, text),
+    now: () => $.clock.now(),
+    toast: text => $.ui.toast(text),
+    getEditing: () => read($, editing),
+    setEditing: async value => {
+      await update($, editing, () => value)
+    },
+  }
+}
+
+function launch($: EngineInterface): void {
+  void startEdit(depsOf($)).catch(error => $.ui.toast(`エディタを開けませんでした: ${String(error)}`))
+}
+
+export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    // 読み直しで待ちの処理は切れるので、編集中の印を消しておく
+    await update($, editing, () => null)
+    const env = await readHostEnv(argv => $.process.run(argv))
+    await update($, inOrca, () => env.handle !== null)
+    await update($, editor, () => env.editor)
+    await $.command.register({
+      name: 'edit',
+      description: 'Orca を上下に分割し、エディタでプロンプトを書く',
+    })
+    return next(e)
+  })
+
+  on('command.run', { command: 'edit' }, $ => {
+    launch($)
+    return {}
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey || !(await read($, inOrca))) return next(e)
+
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const name = (await read($, editor)).split(' ')[0]?.split('/').pop() ?? 'editor'
+    const isEditing = (await read($, editing)) !== null
+
+    return (
+      <Box>
+        <Button
+          key="edit"
+          label={isEditing ? 'Ctrl+G: 編集中のペインへ' : `Ctrl+G: ${name} で書く`}
+          action={KEY_ACTION}
+          plain
+          dimColor
+          onPress={() => launch($)}
+        />
+        {isEditing && <Text dimColor>  {name} で編集中(保存して閉じるとプロンプト欄に入ります)</Text>}
+      </Box>
+    )
+  })
+}
