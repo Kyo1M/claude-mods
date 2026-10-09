@@ -67,7 +67,7 @@ test('分割してエディタで書いた文がプロンプト欄に入る', as
   expect(f.prompt()).toBe('xyz')
   const split = f.calls.find(c => c[2] === 'split')!
   expect(split).toEqual([
-    ORCA, 'terminal', 'split', '--terminal', 'term_me', '--direction', 'vertical',
+    ORCA, 'terminal', 'split', '--terminal', 'term_me', '--direction', 'horizontal',
     '--command', 'exec hx /tmp/claude-orca-split-editor/draft-1.md', '--json',
   ])
   expect(f.files.size).toBe(1)

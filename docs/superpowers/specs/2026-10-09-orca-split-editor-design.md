@@ -50,7 +50,7 @@ claude-mods/
 1. 編集中ならトースト「すでに編集中です」を出し、`orca terminal focus` で分割ペインへ移る。新しくは開かない。
 2. `printenv` で `ORCA_TERMINAL_HANDLE`・`VISUAL`・`EDITOR` を読む。ハンドルが無ければトースト「Orca の外では使えません(Ctrl+X Ctrl+E で標準の外部エディタ)」を出して終わる。
 3. `$.prompt.read()` で下書きを取り、`/tmp/claude-orca-split-editor/draft-<時刻>.md` に書く(`$.fs.write`)。
-4. `orca terminal split --terminal <ハンドル> --direction <上下> --command "exec <エディタ> '<ファイル>'" --json` を実行し、JSON から新しいペインのハンドルを取る。失敗したらトーストで理由を出して終わる。
+4. `orca terminal split --terminal <ハンドル> --direction horizontal --command "exec <エディタ> '<ファイル>'" --json` を実行し、JSON から新しいペインのハンドルを取る。失敗したらトーストで理由を出して終わる。
 5. 状態を「編集中」にする(帯が切り替わる)。
 6. `orca terminal wait --terminal <新ハンドル> --for exit --timeout-ms 600000` を `$.process.spawn` で待ち、上限が切れたら待ち直す(`$.process.run` は最長 10 分で切れるため、長文の編集に備えて spawn を使う)。待つ処理はフックから切り離し、Claude Code の操作を止めない。
 7. 終了を確認できたら `orca terminal close --terminal <新ハンドル>` で分割ペインを閉じ(すでに閉じていても害はない)、`orca terminal focus` で Claude Code のペインへ戻る。
@@ -108,7 +108,7 @@ Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 ## 実装時に確かめたこと
 
 - キー割り当て:使い捨ての mod で試し、方法 1(帯の Button の `action`)は 3 つの候補すべてで押された。方法 2 は、Chat の `ctrl+g` を外しても Ctrl+G が `prompt.edit` に届かなかった。そこで方法 1 を採り、`app:toggleReplTab` を使う。
-- 上下の分割は `--direction vertical`(Orca の手順書で `horizontal` は左右、`vertical` は上下)。
+- 上下の分割は `--direction horizontal`。Orca の手順書には `vertical` が上下とあるが、実際に試すと `vertical` は左右に分かれた。
 - `/edit` は手元の commands・skills と重ならない。
 
 `--command` の文字列がシェルで解釈されること(`;` と `exit` が効く)は確認済み。一時ファイルのパスには空白を含めない。

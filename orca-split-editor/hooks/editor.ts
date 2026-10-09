@@ -90,7 +90,7 @@ export async function startEdit(deps: Deps): Promise<void> {
   const split = await deps.run([
     ORCA, 'terminal', 'split',
     '--terminal', env.handle,
-    '--direction', 'vertical',
+    '--direction', 'horizontal',
     '--command', `exec ${env.editor} ${file}`,
     '--json',
   ])
