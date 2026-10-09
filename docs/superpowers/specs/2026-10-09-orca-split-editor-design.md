@@ -12,7 +12,7 @@ Claude Code の返答を見ながら、使い慣れたエディタ(hx)でプロ�
 2. mod：プロンプト欄の今の下書きを一時ファイルに書き出す。
 3. mod：`orca terminal split` で今の Orca ペインを上下に分割し、下側で `$VISUAL`(無ければ `$EDITOR`、それも無ければ `vi`)を開く。プロンプト欄の上の帯に「hx で編集中(保存して閉じるとプロンプト欄に入ります)」と出す。
 4. ヒト：上側で会話を見ながら、下側のエディタで書いて保存して閉じる。
-5. mod：`orca terminal wait --for exit` でエディタの終了を受け取り、一時ファイルの内容でプロンプト欄を置き換える(末尾の改行 1 つは落とす)。分割ペインはエディタの終了とともに閉じる。
+5. mod：`orca terminal wait --for exit` でエディタの終了を受け取り、分割ペインを閉じ、一時ファイルの内容でプロンプト欄を置き換える(末尾の改行 1 つは落とす)。
 6. ヒト：内容を確かめて Enter で送信する(mod は自動送信しない)。
 
 保存せずに閉じた場合(`:q!` 等)は一時ファイルが元の下書きのままなので、プロンプト欄も変わらない。
@@ -20,6 +20,8 @@ Claude Code の返答を見ながら、使い慣れたエディタ(hx)でプロ�
 ## 構成
 
 リポジトリ `~/Developer/claude-mods/`(git 管理)に mod を置き、`~/.claude/settings.json` の `env.CLAUDE_CODE_PLUGIN_DIRS` で読み込む。対話セッションでは、このフォルダを保存すると mod が読み直される。
+
+この設定が効くのは次に起動したセッションからなので、開発中のセッションでは `~/.claude/dev-mods/<セッション ID>/orca-split-editor` にリポジトリのフォルダへのシンボリックリンクを置き、保存のたびに読み直されるようにする。
 
 ```
 claude-mods/
@@ -51,7 +53,8 @@ claude-mods/
 4. `orca terminal split --terminal <ハンドル> --direction <上下> --command "exec <エディタ> '<ファイル>'" --json` を実行し、JSON から新しいペインのハンドルを取る。失敗したらトーストで理由を出して終わる。
 5. 状態を「編集中」にする(帯が切り替わる)。
 6. `orca terminal wait --terminal <新ハンドル> --for exit` を `$.process.spawn` で待つ(`$.process.run` は最長 10 分で切れるため、長文の編集に備えて spawn を使う)。待つ処理はフックから切り離し、Claude Code の操作を止めない。
-7. 終了したらファイルを読み、`$.prompt.fill({ text, mode: "replace" })` で入れる。状態を「待機中」に戻し、一時ファイルは残す(取り込みに失敗したときに手で拾えるように)。
+7. 終了したら `orca terminal close --terminal <新ハンドル>` で分割ペインを閉じる(すでに閉じていても害はない)。
+8. ファイルを読み、`$.prompt.fill({ text, mode: "replace" })` で入れる。状態を「待機中」に戻し、一時ファイルは残す(取り込みに失敗したときに手で拾えるように)。
 
 `orca` は `/Applications/Orca.app/Contents/Resources/bin/orca` を使う(`/usr/local/bin/orca` のリンクは権限の都合で動かないことを確認済み)。
 
@@ -62,7 +65,12 @@ mod は本体の Ctrl+G(`chat:externalEditor`)を横取りできない。本体�
 - Chat の `ctrl+g` を外す(`null`)。標準の外部エディタは既定の `ctrl+x ctrl+e` で引き続き使える。
 - Global の `ctrl+g` を、本体の処理が常駐していない action に割り当てる。帯の Button が同じ action を名乗り、Ctrl+G で押される。
 
-使う action は実装時に試して決める。候補は `app:toggleDiffPreSession`・`app:toggleDiffNoiseFilter`・`app:toggleReplTab`(いずれも既定のキーが無い)。どれも効かなかった場合は Ctrl+G を本体に戻し、`/edit` だけで起動する。
+この方式はまだ試していないため、mod 本体より先に、使い捨ての mod で次の 2 つを順に試す。
+
+1. 帯の Button の `action`:既定のキーが無い action(`app:toggleDiffPreSession`・`app:toggleDiffNoiseFilter`・`app:toggleReplTab`)を Ctrl+G に割り当て、Button が押されるか試す。いずれも Global の action なので、本体の処理が常駐していて押されない可能性がある。
+2. `prompt.edit`:Chat の `ctrl+g` を外したうえで、Ctrl+G が `prompt.edit` に `e.key` 付きで届くか試す。届けばそのキーを消費して `startEdit` を呼べるため、帯は要らない。
+
+2 が使えれば 2 を採る(帯を常に出さずに済み、簡単なため)。どちらも効かなかった場合は、`/edit` だけで済ませずに、mod なしの案(`$VISUAL` を「Orca を分割してエディタを開き、閉じるまで待つ」スクリプトに差し替える案)と比べて相談し直す。
 
 Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 
@@ -75,6 +83,7 @@ Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 | 編集中にもう一度起動 | 分割ペインへ移るだけ |
 | 待機の `orca terminal wait` が異常終了 | ファイルはそのまま取り込みを試み、トーストで知らせる |
 | ファイルが読めない | トーストに一時ファイルのパスを出す |
+| プロンプト欄に入らない(`fill` が `isFilled: false`。ダイアログ表示中など) | トーストに一時ファイルのパスを出す |
 | mod の読み直し(保存時) | 待機中の処理は切れる。状態だけ「編集中」が残るので、`session.start` で待機中に戻す |
 
 ## テスト
@@ -97,7 +106,8 @@ Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 
 ## 実装時に確かめること
 
+- 最初に:Ctrl+G で起動できるか(「キー割り当て」の 2 つの試し)。これが決まるまで mod 本体には入らない。
 - 上下に分ける `--direction` の値(`horizontal` と `vertical` のどちらが上下か)。
-- キー割り当てに使える action(上記の候補)。
-- `--command` の文字列がシェルで解釈されるか(`exec` とクォートが効くか)。
 - `/edit` が他のコマンドと重ならないか(手元の commands・skills には無いことを確認済み)。
+
+`--command` の文字列がシェルで解釈されること(`;` と `exit` が効く)は確認済み。一時ファイルのパスには空白を含めない。
