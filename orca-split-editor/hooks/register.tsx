@@ -71,17 +71,20 @@ export const register: Register = on => {
     const name = (await read($, editor)).split(' ')[0]?.split('/').pop() ?? 'editor'
     const isEditing = (await read($, editing)) !== null
 
+    // 待機中のボタンは隠す。Ctrl+G で押すために描画には残す
     return (
       <Box>
-        <Button
-          key="edit"
-          label={isEditing ? 'Ctrl+G: 編集中のペインへ' : `Ctrl+G: ${name} で書く`}
-          action={KEY_ACTION}
-          plain
-          dimColor
-          onPress={() => launch($)}
-        />
-        {isEditing && <Text dimColor>  {name} で編集中(保存して閉じるとプロンプト欄に入ります)</Text>}
+        <Box display={isEditing ? 'flex' : 'none'}>
+          <Button
+            key="edit"
+            label="Ctrl+G: 編集中のペインへ"
+            action={KEY_ACTION}
+            plain
+            dimColor
+            onPress={() => launch($)}
+          />
+          <Text dimColor>  {name} で編集中(保存して閉じるとプロンプト欄に入ります)</Text>
+        </Box>
       </Box>
     )
   })
