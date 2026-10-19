@@ -18,6 +18,15 @@ Claude Code のプロンプト欄で次の 1 行を入力します。
 
 マーケットプレイスの追加を聞かれたら `y` を押し、スコープは user を選びます。
 
+対話なしで入れるとき(セットアップを Claude に任せるとき等)は、ターミナルで次の 2 行を実行します。
+
+```sh
+claude plugin marketplace add Kyo1M/claude-mods
+claude plugin install orca-split-editor@claude-mods --scope user
+```
+
+更新は `claude plugin marketplace update claude-mods` → `claude plugin update orca-split-editor@claude-mods` → Claude Code で `/reload-plugins` です。
+
 ### orca-split-editor のキー割り当て
 
 mod は本体の Ctrl+G(外部エディタ)を横取りできないため、`~/.claude/keybindings.json` で Ctrl+G を本体から外し、mod に回します。標準の外部エディタは既定の Ctrl+X Ctrl+E で引き続き使えます。
