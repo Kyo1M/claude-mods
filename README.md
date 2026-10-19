@@ -44,7 +44,7 @@ claude plugin marketplace add ~/Developer/claude-mods
 claude plugin install orca-split-editor@claude-mods --scope user
 ```
 
-ファイルを直したら、Claude Code で `/reload-plugins` を実行すると反映されます。
+ファイルを直したら、Claude Code で `/reload-plugins` を実行すると反映されます。GitHub から入れている環境に届けるときは、`<mod 名>/.claude-plugin/plugin.json` の `version` を上げてから push します(入れた側は版の番号で入れ替わるため)。
 
 確認は mod ごとに次の 2 つで行います。
 
