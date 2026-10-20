@@ -11,6 +11,7 @@ export type Deps = {
   /** run と同じだが時間制限なし(エディタの終了待ちに使う) */
   runLong: (argv: readonly string[]) => Promise<RunResult>
   readPrompt: () => Promise<string>
+  readClipboard: () => Promise<string>
   /** 入れられたら true */
   fillPrompt: (text: string) => Promise<boolean>
   readFile: (path: string) => Promise<string>
@@ -61,6 +62,36 @@ export async function waitForEditor(deps: Deps, handle: string): Promise<boolean
   }
 }
 
+/** 本体が長い貼り付けを折りたたんだ印。中身は mod から読めない */
+const PASTE_MARK = /\[Pasted text #(\d+)(?: \+(\d+) lines)?\]/g
+
+/** 本体の貼り付け処理と同じく、改行を \n に、タブを空白 4 つにそろえる */
+export function normalizePaste(text: string): string {
+  return text.replace(/\r\n|\r/g, '\n').replaceAll('\t', '    ')
+}
+
+/**
+ * 折りたたまれた貼り付けのうち最後のものを、クリップボードの中身に戻す。
+ * 貼り付けた後に別のものをコピーしていることがあるので、行数が印と合うときだけ戻す。
+ * `left` は戻せずに残った印の数。
+ */
+export function expandPaste(draft: string, clipboard: string): { text: string; left: number } {
+  const marks = [...draft.matchAll(PASTE_MARK)]
+  const last = marks.reduce<RegExpMatchArray | undefined>(
+    (a, b) => (a && Number(a[1]) > Number(b[1]) ? a : b),
+    undefined,
+  )
+  if (!last) return { text: draft, left: 0 }
+  const content = normalizePaste(clipboard)
+  const lines = content.match(/\n/g)?.length ?? 0
+  if (content === '' || lines !== Number(last[2] ?? 0)) return { text: draft, left: marks.length }
+  const at = last.index!
+  return {
+    text: draft.slice(0, at) + content + draft.slice(at + last[0].length),
+    left: marks.length - 1,
+  }
+}
+
 function firstLine(r: RunResult): string {
   return (r.stderr.trim() || r.stdout.trim()).split('\n')[0] ?? ''
 }
@@ -83,7 +114,14 @@ export async function startEdit(deps: Deps): Promise<void> {
     return
   }
 
-  const draft = await deps.readPrompt()
+  let draft = await deps.readPrompt()
+  if (draft.includes('[Pasted text #')) {
+    const expanded = expandPaste(draft, await deps.readClipboard().catch(() => ''))
+    draft = expanded.text
+    if (expanded.left > 0) {
+      deps.toast(`貼り付け ${expanded.left} 件はクリップボードと合わないため、折りたたんだまま開きます`)
+    }
+  }
   const file = `${DRAFT_DIR}/draft-${await deps.now()}.md`
   await deps.writeFile(file, draft)
 

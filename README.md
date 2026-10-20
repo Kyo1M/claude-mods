@@ -6,7 +6,7 @@ Claude Code の mod(画面や動きを変える hooks プラグイン)を置く�
 
 | mod | できること | 前提 |
 |---|---|---|
-| [orca-split-editor](orca-split-editor/) | Ctrl+G か `/edit` で Orca のペインを上下に分割し、下側のエディタでプロンプトを書く。保存して閉じると書いた文がプロンプト欄に入る | Orca 上の Claude Code、`$VISUAL` か `$EDITOR` |
+| [orca-split-editor](orca-split-editor/) | Ctrl+G か `/edit` で Orca のペインを上下に分割し、下側のエディタでプロンプトを書く。保存して閉じると書いた文がプロンプト欄に入る。`[Pasted text #N]` に折りたたまれた最後の貼り付けはクリップボードから戻して開く | Orca 上の Claude Code、`$VISUAL` か `$EDITOR` |
 
 ## 入れ方
 

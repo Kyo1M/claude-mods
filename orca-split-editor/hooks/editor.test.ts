@@ -15,11 +15,13 @@ function fakeDeps(opts: {
   afterEdit?: string
   editing?: Editing | null
   waits?: string[]
+  prompt?: string
+  clipboard?: string | Error
 }) {
   const files = new Map<string, string>()
   const calls: string[][] = []
   const toasts: string[] = []
-  let prompt = 'abc'
+  let prompt = opts.prompt ?? 'abc'
   let editing: Editing | null = opts.editing ?? null
   const waits = [...(opts.waits ?? [WAIT_DONE])]
   const deps: Deps = {
@@ -39,6 +41,10 @@ function fakeDeps(opts: {
       return { exitCode: stdout === WAIT_DONE ? 0 : 1, stdout, stderr: '' }
     },
     readPrompt: async () => prompt,
+    readClipboard: async () => {
+      if (opts.clipboard instanceof Error) throw opts.clipboard
+      return opts.clipboard ?? ''
+    },
     fillPrompt: async text => {
       prompt = text
       return true
@@ -114,5 +120,42 @@ test('終了を確認できなければペインを閉じず取り込まない',
   expect(f.calls.some(c => c[2] === 'close')).toBe(false)
   expect(f.prompt()).toBe('abc')
   expect(f.editing()).toBe(null)
+  expect(f.toasts).toHaveLength(1)
+})
+
+test('折りたたまれた貼り付けをクリップボードの中身に戻して開き、そのまま入れる', async () => {
+  const f = fakeDeps({
+    env: ORCA_ENV,
+    prompt: 'see [Pasted text #1 +2 lines] end',
+    clipboard: 'a\r\nb\tc\n',
+  })
+  await startEdit(f.deps)
+  expect([...f.files.values()]).toEqual(['see a\nb    c\n end'])
+  expect(f.prompt()).toBe('see a\nb    c\n end')
+  expect(f.toasts).toEqual([])
+})
+
+test('クリップボードと行数が合わなければ折りたたんだまま開いて知らせる', async () => {
+  const f = fakeDeps({ env: ORCA_ENV, prompt: 'x [Pasted text #1 +5 lines]', clipboard: 'other' })
+  await startEdit(f.deps)
+  expect([...f.files.values()]).toEqual(['x [Pasted text #1 +5 lines]'])
+  expect(f.toasts).toHaveLength(1)
+})
+
+test('貼り付けが複数あれば最後のものだけ戻す', async () => {
+  const f = fakeDeps({
+    env: ORCA_ENV,
+    prompt: '[Pasted text #1 +3 lines] / [Pasted text #2]',
+    clipboard: 'long single line',
+  })
+  await startEdit(f.deps)
+  expect([...f.files.values()]).toEqual(['[Pasted text #1 +3 lines] / long single line'])
+  expect(f.toasts).toEqual(['貼り付け 1 件はクリップボードと合わないため、折りたたんだまま開きます'])
+})
+
+test('クリップボードを読めなければ折りたたんだまま開いて知らせる', async () => {
+  const f = fakeDeps({ env: ORCA_ENV, prompt: '[Pasted text #1]', clipboard: new Error('pbpaste') })
+  await startEdit(f.deps)
+  expect([...f.files.values()]).toEqual(['[Pasted text #1]'])
   expect(f.toasts).toHaveLength(1)
 })

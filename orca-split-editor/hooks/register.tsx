@@ -29,6 +29,9 @@ function depsOf($: EngineInterface): Deps {
       return { exitCode: code ?? 1, stdout, stderr }
     },
     readPrompt: async () => (await $.prompt.read()).text,
+    // LANG が UTF-8 でないと pbpaste は日本語を化けさせる
+    readClipboard: async () =>
+      (await $.process.run(['/usr/bin/pbpaste'], { env: { LANG: 'en_US.UTF-8' }, timeoutMs: 5_000 })).stdout,
     fillPrompt: async text => (await $.prompt.fill({ text, mode: 'replace' })).isFilled,
     readFile: async path => String(await $.fs.read(path)),
     writeFile: (path, text) => $.fs.write(path, text),
