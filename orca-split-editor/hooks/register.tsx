@@ -29,6 +29,16 @@ function depsOf($: EngineInterface): Deps {
       return { exitCode: code ?? 1, stdout, stderr }
     },
     readPrompt: async () => (await $.prompt.read()).text,
+    readClipboard: async () => {
+      // ロケールが UTF-8 でないと pbpaste は日本語を化けさせる
+      const r = await $.process.run(['/usr/bin/pbpaste'], {
+        env: { LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
+        timeoutMs: 5_000,
+      })
+      // 途中で切れた中身は行数が合っても戻さない
+      if (r.exitCode !== 0 || r.isStdoutTruncated) throw new Error('pbpaste')
+      return r.stdout
+    },
     fillPrompt: async text => (await $.prompt.fill({ text, mode: 'replace' })).isFilled,
     readFile: async path => String(await $.fs.read(path)),
     writeFile: (path, text) => $.fs.write(path, text),
