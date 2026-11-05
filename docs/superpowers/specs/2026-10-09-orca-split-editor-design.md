@@ -39,11 +39,9 @@ claude-mods/
 
 - `session.start`:`/edit` を登録する(`$.command.register`)。
 - `command.run`(`/edit`):`startEdit` を呼ぶ。
-- `ui.render`(`AbovePrompt`):Orca 内では 1 行の帯を描く。
-  - 待機中は「Ctrl+G: hx で書く」を薄く出す。押すと `startEdit`。
-  - 編集中は「hx で編集中(保存して閉じるとプロンプト欄に入ります)」を出す。
-  - 帯の Button に `action`(後述のキー割り当て)を付け、Ctrl+G で押されるようにする。
-  - Orca の外では `next(e)` を返して何も描かない。
+- `ui.render`(`AbovePrompt`):Orca 内の編集中だけ 1 行の帯を描く。
+  - 「hx で編集中(保存して閉じるとプロンプト欄に入ります)」を出す。押すと編集中のペインへ移る。
+  - 待機中と Orca の外では `next(e)` を返して何も描かない。
 
 ### editor.ts(`startEdit`)
 
@@ -60,17 +58,14 @@ claude-mods/
 
 ## キー割り当て
 
-mod は本体の Ctrl+G(`chat:externalEditor`)を横取りできない。本体の処理がある間は mod のキーが効かない仕様のため。そこで `~/.claude/keybindings.json` を次のように変える。
+mod は本体の Ctrl+G(`chat:externalEditor`)を横取りできない。本体の処理がある間は mod のキーが効かない仕様のため。そこで `~/.claude/keybindings.json` で Chat の `ctrl+g` を `command:edit` に割り当て直す。`command:` の割り当ては、スラッシュコマンドを打ったのと同じように実行する本体の機能で、本体の action を介さない。標準の外部エディタは既定の `ctrl+x ctrl+e` で引き続き使える。
 
-- Chat の `ctrl+g` を外す(`null`)。標準の外部エディタは既定の `ctrl+x ctrl+e` で引き続き使える。
-- Global の `ctrl+g` を、本体の処理が常駐していない action に割り当てる。帯の Button が同じ action を名乗り、Ctrl+G で押される。
+当初は、使い捨ての mod で次の 2 つを試し、方法 1 を採っていた。
 
-この方式はまだ試していないため、mod 本体より先に、使い捨ての mod で次の 2 つを順に試す。
+1. 帯の Button の `action`:既定のキーが無い action(`app:toggleDiffPreSession`・`app:toggleDiffNoiseFilter`・`app:toggleReplTab`)を Global の Ctrl+G に割り当て、Button に押させる。
+2. `prompt.edit`:Chat の `ctrl+g` を外したうえで、Ctrl+G を `prompt.edit` で受け取る。
 
-1. 帯の Button の `action`:既定のキーが無い action(`app:toggleDiffPreSession`・`app:toggleDiffNoiseFilter`・`app:toggleReplTab`)を Ctrl+G に割り当て、Button が押されるか試す。いずれも Global の action なので、本体の処理が常駐していて押されない可能性がある。
-2. `prompt.edit`:Chat の `ctrl+g` を外したうえで、Ctrl+G が `prompt.edit` に `e.key` 付きで届くか試す。届けばそのキーを消費して `startEdit` を呼べるため、帯は要らない。
-
-2 が使えれば 2 を採る(帯を常に出さずに済み、簡単なため)。どちらも効かなかった場合は、`/edit` だけで済ませずに、mod なしの案(`$VISUAL` を「Orca を分割してエディタを開き、閉じるまで待つ」スクリプトに差し替える案)と比べて相談し直す。
+Claude Code 2.1.318 で `app:toggleReplTab` に本体の処理(会話と差分パネルのタブ切り替え)が付き、Ctrl+G で差分パネルが開こうとするようになった。既定のキーが無い action にも後から本体の処理が付きうるため、action を介さない `command:edit` に替えた。
 
 Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 
@@ -119,7 +114,7 @@ Ctrl+E は、プロンプト欄で行末へ移るキーなので使わない。
 
 ## 実装時に確かめたこと
 
-- キー割り当て:使い捨ての mod で試し、方法 1(帯の Button の `action`)は 3 つの候補すべてで押された。方法 2 は、Chat の `ctrl+g` を外しても Ctrl+G が `prompt.edit` に届かなかった。そこで方法 1 を採り、`app:toggleReplTab` を使う。
+- キー割り当て:使い捨ての mod で試し、方法 1(帯の Button の `action`)は 3 つの候補すべてで押された。方法 2 は、Chat の `ctrl+g` を外しても Ctrl+G が `prompt.edit` に届かなかった。そこで方法 1 を採り、`app:toggleReplTab` を使っていた(今の割り当ては「キー割り当て」の節)。
 - 上下の分割は `--direction horizontal`。Orca の手順書には `vertical` が上下とあるが、実際に試すと `vertical` は左右に分かれた。
 - `/edit` は手元の commands・skills と重ならない。
 

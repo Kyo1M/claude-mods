@@ -29,20 +29,19 @@ claude plugin install orca-split-editor@claude-mods --scope user
 
 ### orca-split-editor のキー割り当て
 
-mod は本体の Ctrl+G(外部エディタ)を横取りできないため、`~/.claude/keybindings.json` で Ctrl+G を本体から外し、mod に回します。標準の外部エディタは既定の Ctrl+X Ctrl+E で引き続き使えます。
+mod は本体の Ctrl+G(外部エディタ)を横取りできないため、`~/.claude/keybindings.json` で Ctrl+G を `/edit` の実行に割り当て直します。標準の外部エディタは既定の Ctrl+X Ctrl+E で引き続き使えます。
 
 ```json
 {
   "$schema": "https://www.schemastore.org/claude-code-keybindings.json",
   "$docs": "https://code.claude.com/docs/en/keybindings",
   "bindings": [
-    { "context": "Chat", "bindings": { "ctrl+g": null } },
-    { "context": "Global", "bindings": { "ctrl+g": "app:toggleReplTab" } }
+    { "context": "Chat", "bindings": { "ctrl+g": "command:edit" } }
   ]
 }
 ```
 
-`app:toggleReplTab` は、プロンプト欄の上の帯にある mod のボタンを Ctrl+G で押すための割り当てです。キー割り当てを変えなくても `/edit` で使えます。
+`command:edit` は、`/edit` を打ったのと同じように実行する割り当てです。Orca の外では Ctrl+G を押してもエディタは開かず、トーストで知らせるだけになります。キー割り当てを変えなくても `/edit` で使えます。
 
 ## 手元で開発する
 

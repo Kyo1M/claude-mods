@@ -9,10 +9,6 @@ const editing = atom({ plugin: 'orca-split-editor', key: 'editing' } as const, n
 const inOrca = atom({ plugin: 'orca-split-editor', key: 'inOrca' } as const, false)
 const editor = atom({ plugin: 'orca-split-editor', key: 'editor' } as const, 'vi')
 
-// keybindings.json で Global の ctrl+g をこの action に割り当てる。
-// 本体の処理が常駐しない action なので、帯の Button が Ctrl+G で押される。
-const KEY_ACTION = 'app:toggleReplTab'
-
 function depsOf($: EngineInterface): Deps {
   return {
     run: argv => $.process.run(argv),
@@ -79,22 +75,13 @@ export const register: Register = on => {
 
     const { Box, Button, Text } = $.ui.resolve(e)
     const name = (await read($, editor)).split(' ')[0]?.split('/').pop() ?? 'editor'
-    const isEditing = (await read($, editing)) !== null
+    // 帯は編集中だけ出す。Ctrl+G は keybindings.json で /edit に割り当てる
+    if ((await read($, editing)) === null) return next(e)
 
-    // 待機中のボタンは隠す。Ctrl+G で押すために描画には残す
     return (
       <Box>
-        <Box display={isEditing ? 'flex' : 'none'}>
-          <Button
-            key="edit"
-            label="Ctrl+G: 編集中のペインへ"
-            action={KEY_ACTION}
-            plain
-            dimColor
-            onPress={() => launch($)}
-          />
-          <Text dimColor>  {name} で編集中(保存して閉じるとプロンプト欄に入ります)</Text>
-        </Box>
+        <Button key="edit" label="Ctrl+G: 編集中のペインへ" plain dimColor onPress={() => launch($)} />
+        <Text dimColor>  {name} で編集中(保存して閉じるとプロンプト欄に入ります)</Text>
       </Box>
     )
   })
