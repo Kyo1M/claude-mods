@@ -7,6 +7,7 @@ Claude Code の mod(画面や動きを変える hooks プラグイン)を置く�
 | mod | できること | 前提 |
 |---|---|---|
 | [orca-split-editor](orca-split-editor/) | Ctrl+G か `/edit` で Orca のペインを上下に分割し、下側のエディタでプロンプトを書く。保存して閉じると書いた文がプロンプト欄に入る。`[Pasted text #N]` に折りたたまれた最後の貼り付けは、クリップボードと行数が合えば戻して開く | Orca 上の Claude Code、`$VISUAL` か `$EDITOR` |
+| [copy-block](copy-block/) | 返答の中の貼り付け用ブロック(引き継ぎ文・Slack の文面など)の右上にコピーアイコン `⧉` を出す。クリックするとブロックの中身がクリップボードに入る。対象は、言語指定が無いか `markdown`・`md`・`text`・`txt` のブロック | ターミナルの fullscreen 表示(アイコンのクリックに使う) |
 
 ## 入れ方
 
@@ -16,7 +17,7 @@ Claude Code のプロンプト欄で次の 1 行を入力します。
 /plugin install orca-split-editor --marketplace Kyo1M/claude-mods
 ```
 
-マーケットプレイスの追加を聞かれたら `y` を押し、スコープは user を選びます。
+マーケットプレイスの追加を聞かれたら `y` を押し、スコープは user を選びます。ほかの mod を入れるときは、`orca-split-editor` を mod の名前(`copy-block` など)に置き換えます。
 
 対話なしで入れるとき(セットアップを Claude に任せるとき等)は、ターミナルで次の 2 行を実行します。
 

@@ -1,0 +1,8 @@
+{
+  "name": "copy-block",
+  "version": "0.1.0",
+  "description": "返答の中の貼り付け用ブロックの右上にコピーアイコンを出す",
+  "author": {
+    "name": "Kyo1M"
+  }
+}

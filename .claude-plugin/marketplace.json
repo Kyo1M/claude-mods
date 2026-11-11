@@ -9,6 +9,11 @@
       "name": "orca-split-editor",
       "source": "./orca-split-editor",
       "description": "Orca のペインを上下に分割してエディタでプロンプトを書く"
+    },
+    {
+      "name": "copy-block",
+      "source": "./copy-block",
+      "description": "返答の中の貼り付け用ブロックの右上にコピーアイコンを出す"
     }
   ]
 }
