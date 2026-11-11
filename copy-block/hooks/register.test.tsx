@@ -19,9 +19,9 @@ type On = Parameters<TestBody>[1]
 /** 本体の代わりに、渡された本文と「⏺」の有無を 1 行で描く */
 function standInForEngine(on: On) {
   const drawn: { text: string; isFirstOfReply: boolean }[] = []
-  const copied: string[] = []
+  const copied: { text: string; surface: string | undefined }[] = []
   const toasts: string[] = []
-  const answer = { isCopied: true as boolean }
+  const answer = { isCopied: true as boolean, throws: false }
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
     if (e.component !== 'AssistantMessage') return <Text>other</Text>
@@ -29,7 +29,8 @@ function standInForEngine(on: On) {
     return <Text>{`${e.props.isFirstOfReply ? '⏺ ' : ''}${e.props.text}`}</Text>
   })
   on('ui.copy', (_, e) => {
-    copied.push(e.text)
+    if (answer.throws) throw new Error('clipboard')
+    copied.push({ text: e.text, surface: e.surface })
     return { value: answer.isCopied ? { isCopied: true } : { isCopied: false, reason: 'no-clipboard' } }
   })
   on('ui.toast', (_, e) => {
@@ -46,7 +47,7 @@ test('ブロックのアイコンを押すと、中身をそのままコピー�
   expect(await ui.findAll({ type: 'Button' })).toHaveLength(1)
   await ui.press({ key: 'copy-1' })
 
-  expect(copied).toEqual([lines('# 引き継ぎ', '## 目的')])
+  expect(copied).toEqual([{ text: lines('# 引き継ぎ', '## 目的'), surface: 'terminal' }])
   expect(toasts).toEqual(['コピーしました(2行)'])
   await ui.unmount()
 })
@@ -59,6 +60,8 @@ test('本文を区切りごとに本体へ渡し、「⏺」は最初の区切�
     { text: '引き継ぎ文です。', isFirstOfReply: true },
     { text: lines('```', '# 引き継ぎ', '## 目的', '```'), isFirstOfReply: false },
     { text: '以上です。', isFirstOfReply: false },
+    // 木が通らなかったときに備えて、最後に全文を渡す
+    { text: HANDOFF, isFirstOfReply: true },
   ])
   await ui.unmount()
 })
@@ -67,7 +70,7 @@ test('「⏺」の付かない返答では、どの区切りにも付けない',
   const { drawn } = standInForEngine(on)
   const ui = await $.ui.mount(message(HANDOFF, { isFirstOfReply: false }))
 
-  expect(drawn.map(row => row.isFirstOfReply)).toEqual([false, false, false])
+  expect(drawn.map(row => row.isFirstOfReply)).toEqual([false, false, false, false])
   await ui.unmount()
 })
 
@@ -78,7 +81,7 @@ test('ブロックが複数あるときは、押したブロックだけをコ�
   expect(await ui.findAll({ type: 'Button' })).toHaveLength(2)
   await ui.press({ key: 'copy-2' })
 
-  expect(copied).toEqual(['2 つ目'])
+  expect(copied.map(c => c.text)).toEqual(['2 つ目'])
   await ui.unmount()
 })
 
@@ -124,4 +127,68 @@ test('ターミナル以外では、本体の描画のままにする', async ($
     expect(drawn).toHaveLength(1)
     await ui.unmount()
   }
+})
+
+test('クリップボードへの書き込みが失敗で終わっても、そう知らせる', async ($, on) => {
+  const { toasts, answer } = standInForEngine(on)
+  answer.throws = true
+  const ui = await $.ui.mount(message(HANDOFF))
+
+  await ui.press({ key: 'copy-1' })
+
+  expect(toasts).toEqual(['コピーできませんでした'])
+  await ui.unmount()
+})
+
+test('ブロックから始まる返答では、「⏺」をブロックの区切りに付ける', async ($, on) => {
+  const { drawn, copied } = standInForEngine(on)
+  const ui = await $.ui.mount(message(lines('```', '先頭', '```', '', '説明の文です。')))
+
+  await ui.press({ key: 'copy-0' })
+
+  expect(drawn.slice(0, 2)).toEqual([
+    { text: lines('```', '先頭', '```'), isFirstOfReply: true },
+    { text: '説明の文です。', isFirstOfReply: false },
+  ])
+  expect(copied.map(c => c.text)).toEqual(['先頭'])
+  await ui.unmount()
+})
+
+test('2 つ目以降の区切りを 2 桁右へずらし、アイコンをブロックの上の行の右端に重ねる', async ($, on) => {
+  standInForEngine(on)
+  const ui = await $.ui.mount(message(HANDOFF))
+
+  const boxes = await ui.findAll({ type: 'Box' })
+  expect(boxes.map(box => box.props.paddingLeft).filter(padding => padding !== undefined)).toEqual([0, 2, 2])
+  const overlay = boxes.filter(box => box.props.position === 'absolute')
+  expect(overlay.map(box => [box.props.top, box.props.right])).toEqual([[0, 0]])
+  const button = await ui.find({ key: 'copy-1' })
+  expect([button?.props.label, button?.props.plain, button?.props.dimColor]).toEqual(['⧉', true, true])
+  await ui.unmount()
+})
+
+test('「⏺」の付かない返答では、区切りを右へずらさない', async ($, on) => {
+  standInForEngine(on)
+  const ui = await $.ui.mount(message(HANDOFF, { isFirstOfReply: false }))
+
+  const boxes = await ui.findAll({ type: 'Box' })
+  expect(boxes.map(box => box.props.paddingLeft).filter(padding => padding !== undefined)).toEqual([0, 0, 0])
+  await ui.unmount()
+})
+
+test('fullscreen でない表示では、本体の描画のままにする', async ($, on) => {
+  const { drawn } = standInForEngine(on)
+  const ui = await $.ui.mount({ ...message(HANDOFF), viewport: { columns: 100, rows: 40, isFullscreen: false } })
+
+  expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+  expect(drawn).toHaveLength(1)
+  await ui.unmount()
+})
+
+test('fullscreen の表示では、アイコンを出す', async ($, on) => {
+  standInForEngine(on)
+  const ui = await $.ui.mount({ ...message(HANDOFF), viewport: { columns: 100, rows: 40, isFullscreen: true } })
+
+  expect(await ui.findAll({ type: 'Button' })).toHaveLength(1)
+  await ui.unmount()
 })
