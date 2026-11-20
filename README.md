@@ -65,3 +65,7 @@ claude plugin test orca-split-editor
 ```
 
 新しい mod は `<mod 名>/` にフォルダを作り、`.claude-plugin/marketplace.json` の `plugins` とこの README の一覧に追記します。設計書は `docs/superpowers/specs/` に置きます。
+
+## ライセンス
+
+[MIT License](LICENSE) です。
